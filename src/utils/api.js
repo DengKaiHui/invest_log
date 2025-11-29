@@ -17,14 +17,43 @@ export async function fetchExchangeRate() {
     }
 }
 
-// 获取股票价格
-export async function fetchStockPrice(symbol) {
+// 后端API基础地址
+const API_BASE_URL = 'http://localhost:3001/api';
+
+// 获取单个股票价格
+export async function fetchStockPrice(symbol, force = false) {
     try {
-        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=1d`;
-        const response = await fetch(url, {
+        const url = `${API_BASE_URL}/price/${symbol}${force ? '?force=true' : ''}`;
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.success && data.price) {
+            console.log(`${symbol} 价格: $${data.price}${data.cached ? ' (缓存)' : ''}`);
+            return data.price;
+        }
+        
+        console.warn(`无法获取 ${symbol} 的价格数据`);
+        return null;
+    } catch (error) {
+        console.error(`获取 ${symbol} 价格失败:`, error);
+        return null;
+    }
+}
+
+// 批量获取股票价格
+export async function fetchStockPrices(symbols, force = false) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/prices`, {
+            method: 'POST',
             headers: {
-                'User-Agent': 'Mozilla/5.0'
-            }
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ symbols, force })
         });
         
         if (!response.ok) {
@@ -33,19 +62,41 @@ export async function fetchStockPrice(symbol) {
         
         const data = await response.json();
         
-        if (data.chart && data.chart.result && data.chart.result[0]) {
-            const result = data.chart.result[0];
-            const price = result.meta.regularMarketPrice || result.meta.previousClose;
-            if (price) {
-                console.log(`${symbol} 价格:`, price);
-                return price;
-            }
+        if (data.success) {
+            return data.results;
         }
         
-        console.warn(`无法获取 ${symbol} 的价格数据`);
-        return null;
+        throw new Error(data.message || '批量获取价格失败');
     } catch (error) {
-        console.error(`获取 ${symbol} 价格失败:`, error);
+        console.error('批量获取股票价格失败:', error);
+        return null;
+    }
+}
+
+// 手动刷新价格
+export async function refreshStockPrices(symbols) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/refresh`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ symbols })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            return data.results;
+        }
+        
+        throw new Error(data.message || '刷新价格失败');
+    } catch (error) {
+        console.error('刷新股票价格失败:', error);
         return null;
     }
 }

@@ -2,12 +2,45 @@
 
 一个基于 Vue 3 + Element Plus 的智能投资管理看板，支持 AI 图片识别、实时价格更新、持仓盈亏分析等功能。
 
+## 🎉 新功能：后端价格服务
+
+现已支持 Node.js 后端服务，使用 `yahoo-finance2` 库获取股票价格，提供：
+- ✅ **智能缓存**：价格数据缓存 30 分钟，减少 API 调用
+- ✅ **自动刷新**：后台定时检查并更新过期缓存
+- ✅ **批量获取**：支持一次性获取多个股票价格
+- ✅ **手动刷新**：点击按钮强制更新最新价格
+
+### 快速启动后端服务
+
+```bash
+# 1. 安装依赖
+npm install
+
+# 2. (推荐) 配置 API Key 以提高成功率
+export FINNHUB_KEY="your_key"  # 注册: https://finnhub.io/register
+
+# 3. 启动后端服务
+npm start
+
+# 4. 启动前端（新开终端）
+python3 -m http.server 8000
+# 或使用 VS Code 的 Live Server
+
+# 5. 测试后端服务（可选）
+npm test
+```
+
+**重要提示**: 由于 Yahoo Finance API 经常出现 403 限流，强烈建议配置免费的 Finnhub API Key。
+详细说明请查看 [API_KEY_SETUP.md](API_KEY_SETUP.md)
+
+---
+
 ## 功能特性
 
 - ✏️ **投资记录管理**：手动录入或 AI 识别截图自动录入
 - 📊 **资产分布可视化**：饼图展示资产配置
 - 💰 **持仓盈亏分析**：实时计算每个标的的盈亏情况
-- 🔄 **实时价格更新**：从 Yahoo Finance 获取最新股价
+- 🔄 **实时价格更新**：从 Yahoo Finance 获取最新股价（支持后端缓存）
 - 🙈 **隐私模式**：一键隐藏所有金额信息
 - 🎨 **拖拽排序**：自定义卡片布局
 - 🌐 **汇率自动更新**：支持 USD/CNY 实时汇率
@@ -15,8 +48,12 @@
 ## 项目结构
 
 ```
-investv9/
+InvestLog/
 ├── index.html              # 主入口文件
+├── server.js               # 🆕 后端价格服务
+├── package.json            # 🆕 Node.js 依赖配置
+├── test-server.js          # 🆕 后端服务测试脚本
+├── START_SERVER.md         # 🆕 后端服务使用说明
 ├── src/
 │   ├── styles/            # 样式文件
 │   │   ├── base.css       # 基础样式（全局变量、布局）
@@ -25,11 +62,11 @@ investv9/
 │   ├── utils/             # 工具函数
 │   │   ├── storage.js     # 本地存储封装
 │   │   ├── formatter.js   # 数据格式化工具
-│   │   └── api.js         # API 调用封装
+│   │   └── api.js         # 🔄 API 调用封装（已更新支持后端）
 │   ├── composables/       # Vue Composables
 │   │   ├── useConfig.js   # 配置管理（汇率、AI设置）
 │   │   ├── useRecords.js  # 记录管理（增删改查、AI识别）
-│   │   ├── usePosition.js # 持仓盈亏管理（价格刷新、盈亏计算）
+│   │   ├── usePosition.js # 🔄 持仓盈亏管理（已更新支持后端）
 │   │   └── useChart.js    # 图表管理（ECharts初始化和更新）
 │   └── app.js             # 主应用逻辑（整合所有模块）
 └── README.md              # 项目说明
@@ -143,6 +180,31 @@ npx serve .
 2. **API 限流**: Yahoo Finance API 有请求频率限制，刷新价格时会自动添加延迟
 3. **数据安全**: 所有数据存储在本地，不会上传到服务器
 4. **浏览器兼容**: 推荐使用现代浏览器（Chrome、Firefox、Safari、Edge）
+5. **🔒 API Key 安全**: 
+   - 后端 API Keys 使用环境变量配置，不要硬编码在代码中
+   - 前端 AI API Key 由用户自行配置，存储在浏览器 localStorage
+   - 部署前请阅读 [SECURITY.md](SECURITY.md) 了解安全最佳实践
+
+## 部署到线上
+
+### 准备工作
+
+1. **检查安全配置**：阅读 [SECURITY.md](SECURITY.md)
+2. **配置 API Keys**：
+   - 后端：使用环境变量（不要提交到 Git）
+   - 前端：用户在设置界面自行配置
+
+### 推荐部署方案
+
+**方案 1: 静态托管 + 本地后端（个人使用）**
+- 前端部署到 Vercel/Netlify/GitHub Pages
+- 后端在本地运行（API Keys 完全安全）
+
+**方案 2: 全栈部署（团队使用）**
+- 部署到 Vercel/Render/Railway 等云平台
+- 在云平台控制台配置环境变量
+
+详细说明请参考 [SECURITY.md](SECURITY.md)
 
 ## 许可证
 

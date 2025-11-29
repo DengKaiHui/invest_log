@@ -45,72 +45,20 @@
         <div class="container">
             <el-row :gutter="24" id="draggable-container">
                 <el-col :xs="24" :md="14" data-card="left">
-                    <!-- 记录表单卡片 -->
-                    <el-card class="modern-card" data-card-id="left-0">
-                        <template #header>
-                            <div class="card-header-styled">
-                                <span>
-                                    <span class="drag-handle" title="拖动排序">⋮⋮</span>
-                                    ✏️ 记一笔 (USD)
-                                </span>
-                                <el-upload
-                                    action="#"
-                                    :auto-upload="false"
-                                    :show-file-list="false"
-                                    :on-change="handleImageUpload"
-                                    accept="image/*"
-                                >
-                                    <el-button type="primary" plain round size="small" :loading="analyzing">
-                                        <el-icon style="margin-right:4px"><Camera /></el-icon> 截图识别
-                                    </el-button>
-                                </el-upload>
-                            </div>
-                        </template>
-                        <el-form :model="form" label-position="top">
-                            <el-row :gutter="20">
-                                <el-col :span="12">
-                                    <el-form-item label="资产名称">
-                                        <el-input v-model="form.name" placeholder="例如: NVDA"></el-input>
-                                    </el-form-item>
-                                </el-col>
-                                <el-col :span="12">
-                                    <el-form-item label="交易日期">
-                                        <el-date-picker v-model="form.date" type="date" placeholder="日期" style="width: 100%" format="YYYY-MM-DD" value-format="YYYY-MM-DD"></el-date-picker>
-                                    </el-form-item>
-                                </el-col>
-                            </el-row>
-                            <el-row :gutter="20">
-                                <el-col :span="12">
-                                    <el-form-item label="总金额 ($)">
-                                        <el-input-number v-model="form.total" :min="0" :precision="2" style="width: 100%" :controls="false" placeholder="0.00"></el-input-number>
-                                    </el-form-item>
-                                </el-col>
-                                <el-col :span="12">
-                                    <el-form-item label="单价 ($)">
-                                        <el-input-number v-model="form.price" :min="0" :precision="2" style="width: 100%" :controls="false" placeholder="0.00"></el-input-number>
-                                    </el-form-item>
-                                </el-col>
-                            </el-row>
-                            
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
-                                <div style="font-size: 13px; color: #6b7280;" v-if="calculatedShares > 0">
-                                    预计股数: <span style="color: var(--primary-color); font-weight: bold;">{{ calculatedShares }}</span>
-                                </div>
-                                <div v-else></div>
-                                <el-button type="primary" @click="addRecord" round style="padding: 10px 30px;">提交</el-button>
-                            </div>
-                        </el-form>
-                    </el-card>
-
                     <!-- 持仓明细卡片 -->
-                    <el-card class="modern-card" data-card-id="left-1">
+                    <el-card class="modern-card" data-card-id="left-0">
                         <template #header>
                             <div class="card-header-styled">
                                 <span>
                                     <span class="drag-handle" title="拖动排序">⋮⋮</span>
                                     📋 持仓明细
                                 </span>
-                                <el-button type="danger" link size="small" @click="clearAll">清空</el-button>
+                                <div style="display: flex; gap: 8px;">
+                                    <el-button type="primary" size="small" @click="showAddRecordDialog = true" round>
+                                        <el-icon style="margin-right:4px"><Plus /></el-icon> 记一笔
+                                    </el-button>
+                                    <el-button type="danger" link size="small" @click="clearAll">清空</el-button>
+                                </div>
                             </div>
                         </template>
                         <el-table :data="records" style="width: 100%" height="380">
@@ -151,7 +99,7 @@
                     </el-card>
                     
                     <!-- 持仓盈亏卡片 -->
-                    <el-card class="modern-card position-table" data-card-id="left-2">
+                    <el-card class="modern-card position-table" data-card-id="left-1">
                         <template #header>
                             <div class="card-header-styled">
                                 <span>
@@ -300,6 +248,62 @@
                 </el-col>
             </el-row>
         </div>
+
+        <!-- 记一笔对话框 -->
+        <el-dialog v-model="showAddRecordDialog" title="✏️ 记一笔 (USD)" width="500px">
+            <el-form :model="form" label-position="top">
+                <el-row :gutter="20">
+                    <el-col :span="12">
+                        <el-form-item label="资产名称">
+                            <el-input v-model="form.name" placeholder="例如: NVDA"></el-input>
+                        </el-form-item>
+                    </el-col>
+                    <el-col :span="12">
+                        <el-form-item label="交易日期">
+                            <el-date-picker v-model="form.date" type="date" placeholder="日期" style="width: 100%" format="YYYY-MM-DD" value-format="YYYY-MM-DD"></el-date-picker>
+                        </el-form-item>
+                    </el-col>
+                </el-row>
+                <el-row :gutter="20">
+                    <el-col :span="12">
+                        <el-form-item label="总金额 ($)">
+                            <el-input-number v-model="form.total" :min="0" :precision="2" style="width: 100%" :controls="false" placeholder="0.00"></el-input-number>
+                        </el-form-item>
+                    </el-col>
+                    <el-col :span="12">
+                        <el-form-item label="单价 ($)">
+                            <el-input-number v-model="form.price" :min="0" :precision="2" style="width: 100%" :controls="false" placeholder="0.00"></el-input-number>
+                        </el-form-item>
+                    </el-col>
+                </el-row>
+                
+                <div v-if="calculatedShares > 0" style="padding: 12px; background: #f0f9ff; border-radius: 8px; margin-bottom: 10px;">
+                    <div style="font-size: 13px; color: #0369a1;">
+                        预计股数: <span style="font-weight: bold; font-size: 16px;">{{ calculatedShares }}</span>
+                    </div>
+                </div>
+
+                <el-divider border-style="dashed" style="margin: 15px 0"></el-divider>
+
+                <el-upload
+                    action="#"
+                    :auto-upload="false"
+                    :show-file-list="false"
+                    :on-change="handleImageUpload"
+                    accept="image/*"
+                    style="width: 100%"
+                >
+                    <el-button type="primary" plain style="width: 100%" :loading="analyzing">
+                        <el-icon style="margin-right:4px"><Camera /></el-icon> 
+                        截图识别（自动填充）
+                    </el-button>
+                </el-upload>
+            </el-form>
+            <template #footer>
+                <el-button @click="showAddRecordDialog = false">取消</el-button>
+                <el-button type="primary" @click="addRecordAndClose">提交</el-button>
+            </template>
+        </el-dialog>
 
         <!-- 配置对话框 -->
         <el-dialog v-model="showConfig" title="⚙️ 设置" width="480px" style="border-radius: 12px;">

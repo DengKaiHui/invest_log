@@ -1,0 +1,17 @@
+node_modules/
+.DS_Store
+*.log
+
+# 环境变量文件 - 包含 API Keys
+.env
+.env.local
+.env.*.local
+
+# 用户配置 - localStorage 导出（如果有）
+config.json
+local-config.json
+
+# 临时文件
+*.tmp
+*.temp
+.cache/

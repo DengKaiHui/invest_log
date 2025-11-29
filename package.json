@@ -1,0 +1,25 @@
+{
+  "name": "invest-log",
+  "version": "2.0.1",
+  "description": "AI智能投资看板 - 股票价格服务",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node test-server.js"
+  },
+  "keywords": [
+    "stock",
+    "investment",
+    "portfolio"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "yahoo-finance2": "^2.12.3",
+    "node-fetch": "^3.3.2"
+  }
+}

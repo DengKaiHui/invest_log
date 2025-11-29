@@ -15,6 +15,9 @@ const App = {
         // 隐私模式
         const isPrivacyMode = ref(false);
         
+        // 记一笔弹框控制
+        const showAddRecordDialog = ref(false);
+        
         // 配置管理
         const configModule = useConfig(Vue);
         
@@ -55,6 +58,12 @@ const App = {
             chartModule.updateChart();
         }
         
+        // 添加记录并关闭弹框
+        function addRecordAndClose() {
+            recordsModule.addRecord();
+            showAddRecordDialog.value = false;
+        }
+        
         // 卡片拖动排序
         function initDraggable() {
             const leftColumn = document.querySelector('[data-card="left"]');
@@ -69,6 +78,7 @@ const App = {
             const savedLeftOrder = storage.get(STORAGE_KEYS.CARD_ORDER_LEFT);
             const savedRightOrder = storage.get(STORAGE_KEYS.CARD_ORDER_RIGHT);
             
+            // 过滤掉已经不存在的卡片ID（例如被移除的记录表单 left-0）
             if (savedLeftOrder && savedLeftOrder.length > 0) {
                 savedLeftOrder.forEach(cardId => {
                     const card = leftColumn.querySelector(`[data-card-id="${cardId}"]`);
@@ -135,9 +145,9 @@ const App = {
                 
                 initDraggable();
                 
-                // 自动刷新价格
+                // 自动加载价格（优先使用缓存）
                 if (recordsModule.records.value.length > 0) {
-                    setTimeout(() => positionModule.refreshPrices(), 1000);
+                    setTimeout(() => positionModule.autoLoadPrices(), 1000);
                 }
             });
         });
@@ -158,6 +168,8 @@ const App = {
             // 其他
             isPrivacyMode,
             togglePrivacy,
+            showAddRecordDialog,
+            addRecordAndClose,
             totalAssetUSD,
             totalAssetCNY
         };

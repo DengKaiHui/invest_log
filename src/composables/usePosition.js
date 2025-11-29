@@ -3,7 +3,7 @@
  */
 import { storage, STORAGE_KEYS } from '../utils/storage.js';
 import { formatCurrency, formatDateTime, getProfitClass as utilGetProfitClass } from '../utils/formatter.js';
-import { fetchStockPrice } from '../utils/api.js';
+import { fetchStockPrices, refreshStockPrices } from '../utils/api.js';
 
 export function usePosition(Vue, records) {
     const { ref, computed, watch } = Vue;
@@ -122,7 +122,7 @@ export function usePosition(Vue, records) {
         lastUpdateTime.value = savedUpdateTime;
     }
     
-    // 刷新所有价格
+    // 刷新所有价格（使用后端服务）
     async function refreshPrices() {
         if (positionSummary.value.length === 0) {
             ElementPlus.ElMessage.warning('暂无持仓数据');
@@ -133,23 +133,62 @@ export function usePosition(Vue, records) {
         const symbols = positionSummary.value.map(pos => pos.symbol);
         
         try {
-            // 逐个获取价格，避免并发限流
-            for (const symbol of symbols) {
-                const price = await fetchStockPrice(symbol);
-                if (price) {
-                    stockPrices.value[symbol] = price;
-                }
-                // 添加延迟避免请求过快
-                await new Promise(resolve => setTimeout(resolve, 200));
-            }
+            const results = await refreshStockPrices(symbols);
             
-            lastUpdateTime.value = formatDateTime();
-            ElementPlus.ElMessage.success('价格已更新');
+            if (results) {
+                let successCount = 0;
+                let failCount = 0;
+                
+                Object.entries(results).forEach(([symbol, data]) => {
+                    if (data.price !== null) {
+                        stockPrices.value[symbol] = data.price;
+                        successCount++;
+                    } else {
+                        failCount++;
+                    }
+                });
+                
+                lastUpdateTime.value = formatDateTime();
+                
+                if (failCount === 0) {
+                    ElementPlus.ElMessage.success(`价格已更新 (${successCount}个)`);
+                } else {
+                    ElementPlus.ElMessage.warning(`部分更新成功 (成功: ${successCount}, 失败: ${failCount})`);
+                }
+            } else {
+                throw new Error('无法连接到价格服务');
+            }
         } catch (error) {
             console.error('价格更新失败:', error);
-            ElementPlus.ElMessage.error('价格更新失败');
+            ElementPlus.ElMessage.error('价格更新失败，请确保后端服务已启动');
         } finally {
             priceLoading.value = false;
+        }
+    }
+    
+    // 自动加载价格（使用缓存）
+    async function autoLoadPrices() {
+        if (positionSummary.value.length === 0) {
+            return;
+        }
+        
+        const symbols = positionSummary.value.map(pos => pos.symbol);
+        
+        try {
+            const results = await fetchStockPrices(symbols, false); // 使用缓存
+            
+            if (results) {
+                Object.entries(results).forEach(([symbol, data]) => {
+                    if (data.price !== null) {
+                        stockPrices.value[symbol] = data.price;
+                    }
+                });
+                
+                lastUpdateTime.value = formatDateTime();
+                console.log('价格数据已自动加载');
+            }
+        } catch (error) {
+            console.error('自动加载价格失败:', error);
         }
     }
     
@@ -179,6 +218,7 @@ export function usePosition(Vue, records) {
         totalProfitRate,
         loadPrices,
         refreshPrices,
+        autoLoadPrices,
         getProfitClass
     };
 }
