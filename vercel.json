@@ -21,9 +21,5 @@
     }
   ],
   "buildCommand": "",
-  "outputDirectory": ".",
-  "env": {
-    "FINNHUB_KEY": "@finnhub-key",
-    "ALPHA_VANTAGE_KEY": "@alphavantage-key"
-  }
+  "outputDirectory": "."
 }
