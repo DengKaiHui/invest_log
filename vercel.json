@@ -16,10 +16,24 @@
       "dest": "server.js"
     },
     {
+      "src": "/src/(.*)",
+      "dest": "/src/$1"
+    },
+    {
+      "src": "/css/(.*)",
+      "dest": "/css/$1"
+    },
+    {
+      "src": "/js/(.*)",
+      "dest": "/js/$1"
+    },
+    {
+      "src": "/(.*\\.(css|js|png|jpg|jpeg|gif|svg|ico))",
+      "dest": "/$1"
+    },
+    {
       "src": "/(.*)",
-      "dest": "$1"
+      "dest": "/index.html"
     }
-  ],
-  "buildCommand": "",
-  "outputDirectory": "."
+  ]
 }
