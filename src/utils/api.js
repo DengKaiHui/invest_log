@@ -3,7 +3,7 @@
  */
 
 // 后端API基础地址
-const API_BASE_URL = 'http://localhost:3001/api';
+const API_BASE_URL = 'window.location.origin';
 
 // 获取汇率
 export async function fetchExchangeRate() {
