@@ -115,12 +115,30 @@ export function usePosition(Vue, records) {
         return (rate < 0 ? '-' : '') + Math.abs(rate).toFixed(2);
     });
     
-    // 加载价格数据
-    function loadPrices() {
-        const savedPrices = storage.get(STORAGE_KEYS.STOCK_PRICES, {});
-        const savedUpdateTime = storage.get(STORAGE_KEYS.LAST_UPDATE_TIME, '');
-        stockPrices.value = savedPrices;
-        lastUpdateTime.value = savedUpdateTime;
+    // 加载价格数据（从数据库读取）
+    async function loadPrices() {
+        if (positionSummary.value.length === 0) {
+            return;
+        }
+        
+        const symbols = positionSummary.value.map(pos => pos.symbol);
+        
+        try {
+            const results = await fetchStockPrices(symbols, false); // 从数据库缓存读取
+            
+            if (results) {
+                Object.entries(results).forEach(([symbol, data]) => {
+                    if (data.price !== null) {
+                        stockPrices.value[symbol] = data.price;
+                    }
+                });
+                
+                lastUpdateTime.value = formatDateTime();
+                console.log('价格数据已从数据库加载');
+            }
+        } catch (error) {
+            console.error('加载价格失败:', error);
+        }
     }
     
     // 刷新所有价格（使用后端服务）
@@ -167,45 +185,15 @@ export function usePosition(Vue, records) {
         }
     }
     
-    // 自动加载价格（使用缓存）
+    // 自动加载价格（使用数据库缓存）
     async function autoLoadPrices() {
-        if (positionSummary.value.length === 0) {
-            return;
-        }
-        
-        const symbols = positionSummary.value.map(pos => pos.symbol);
-        
-        try {
-            const results = await fetchStockPrices(symbols, false); // 使用缓存
-            
-            if (results) {
-                Object.entries(results).forEach(([symbol, data]) => {
-                    if (data.price !== null) {
-                        stockPrices.value[symbol] = data.price;
-                    }
-                });
-                
-                lastUpdateTime.value = formatDateTime();
-                console.log('价格数据已自动加载');
-            }
-        } catch (error) {
-            console.error('自动加载价格失败:', error);
-        }
+        await loadPrices();
     }
     
     // 获取盈亏样式类名
     function getProfitClass(value) {
         return utilGetProfitClass(value);
     }
-    
-    // 监听价格变化，自动保存
-    watch(stockPrices, (newPrices) => {
-        storage.set(STORAGE_KEYS.STOCK_PRICES, newPrices);
-    }, { deep: true });
-    
-    watch(lastUpdateTime, (newTime) => {
-        storage.set(STORAGE_KEYS.LAST_UPDATE_TIME, newTime);
-    });
     
     return {
         priceLoading,

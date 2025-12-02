@@ -10,6 +10,7 @@ import cors from 'cors';
 import fetch from 'node-fetch';
 import multer from 'multer';
 import path from 'path';
+import cron from 'node-cron';
 import { fileURLToPath } from 'url';
 import { initDatabase, transactionDB, configDB, priceCacheDB } from './database.js';
 import { importCSV, exportCSV, validateCSV } from './csv-handler.js';
@@ -613,6 +614,56 @@ app.post('/api/refresh', async (req, res) => {
 });
 
 // ================== 启动服务器 ==================
+
+/**
+ * 获取所有持仓的股票代码
+ */
+function getAllSymbols() {
+    const summary = transactionDB.getSummary();
+    return summary.map(item => item.symbol);
+}
+
+/**
+ * 定时任务：每天早上7点自动刷新所有持仓股票价格
+ */
+async function scheduledPriceRefresh() {
+    console.log('\n=== 定时刷新股票价格 ===');
+    console.log(`时间: ${new Date().toLocaleString('zh-CN')}`);
+    
+    const symbols = getAllSymbols();
+    
+    if (symbols.length === 0) {
+        console.log('暂无持仓数据，跳过刷新');
+        return;
+    }
+    
+    console.log(`需要刷新的股票: ${symbols.join(', ')}`);
+    
+    let successCount = 0;
+    let failCount = 0;
+    
+    for (const symbol of symbols) {
+        const price = await fetchStockPrice(symbol, 0);
+        if (price !== null) {
+            successCount++;
+        } else {
+            failCount++;
+        }
+        // 每个请求间隔1秒，避免API限流
+        await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+    
+    console.log(`刷新完成: 成功 ${successCount} 个，失败 ${failCount} 个`);
+    console.log('========================\n');
+}
+
+// 初始化定时任务：每天早上7点（北京时间）
+cron.schedule('0 7 * * *', scheduledPriceRefresh, {
+    scheduled: true,
+    timezone: "Asia/Shanghai"
+});
+
+console.log('✓ 定时任务已启动: 每天早上7:00自动刷新股票价格');
 
 app.listen(PORT, () => {
     console.log(`\n${'='.repeat(60)}`);

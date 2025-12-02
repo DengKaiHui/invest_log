@@ -140,11 +140,10 @@ const App = {
         }
         
         // 生命周期
-        onMounted(() => {
+        onMounted(async () => {
             // 加载数据（汇率会在 loadConfig 中自动处理）
             configModule.loadConfig();
-            recordsModule.loadRecords();
-            positionModule.loadPrices();
+            await recordsModule.loadRecords();
             
             // 初始化图表和拖动
             nextTick(() => {
@@ -157,9 +156,9 @@ const App = {
                 
                 initDraggable();
                 
-                // 自动加载价格（优先使用缓存）
+                // 加载价格数据（从数据库读取）
                 if (recordsModule.records.value.length > 0) {
-                    setTimeout(() => positionModule.autoLoadPrices(), 1000);
+                    setTimeout(() => positionModule.loadPrices(), 500);
                 }
             });
         });
