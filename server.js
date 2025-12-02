@@ -540,7 +540,7 @@ app.post('/api/prices', async (req, res) => {
         const results = {};
         
         for (const symbol of symbols) {
-            const price = await fetchStockPrice(symbol, 0);
+            const price = await fetchStockPrice(symbol, 2);
             if (price !== null) {
                 results[symbol] = {
                     price,
@@ -584,7 +584,7 @@ app.post('/api/refresh', async (req, res) => {
         const results = {};
         
         for (const symbol of symbols) {
-            const price = await fetchStockPrice(symbol, 0);
+            const price = await fetchStockPrice(symbol, 2);
             if (price !== null) {
                 results[symbol] = {
                     price,
@@ -643,7 +643,7 @@ async function scheduledPriceRefresh() {
     let failCount = 0;
     
     for (const symbol of symbols) {
-        const price = await fetchStockPrice(symbol, 0);
+        const price = await fetchStockPrice(symbol, 2);
         if (price !== null) {
             successCount++;
         } else {
