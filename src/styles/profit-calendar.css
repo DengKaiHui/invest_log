@@ -1,0 +1,217 @@
+/* 收益日历样式 */
+.profit-calendar-card {
+    min-height: 500px;
+}
+
+.profit-calendar-content {
+    padding: 10px 0;
+}
+
+/* 日历头部 */
+.calendar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding: 0 10px;
+}
+
+.calendar-header .el-button {
+    width: 36px;
+    height: 36px;
+    background: #f3f4f6;
+    border: none;
+    color: #374151;
+    transition: all 0.2s;
+}
+
+.calendar-header .el-button:hover {
+    background: #e5e7eb;
+    color: #1f2937;
+    transform: scale(1.05);
+}
+
+.calendar-header .el-button .el-icon {
+    font-size: 16px;
+    font-weight: bold;
+}
+
+.calendar-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: #1f2937;
+}
+
+/* 月/年收益汇总 */
+.month-summary,
+.year-summary {
+    text-align: center;
+    padding: 20px;
+    background: #f9fafb;
+    border-radius: 12px;
+    margin-bottom: 20px;
+}
+
+.summary-label {
+    font-size: 13px;
+    color: #6b7280;
+    margin-bottom: 8px;
+}
+
+.summary-value {
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 5px;
+}
+
+.summary-rate {
+    font-size: 14px;
+    font-weight: 500;
+}
+
+/* 星期标题 */
+.weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+    margin-bottom: 8px;
+    padding: 0 4px;
+}
+
+.weekday {
+    text-align: center;
+    font-size: 12px;
+    color: #6b7280;
+    font-weight: 600;
+    padding: 6px 0;
+}
+
+/* 日历网格 */
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+    padding: 0 4px;
+}
+
+.calendar-cell {
+    aspect-ratio: 1;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background: #fff;
+    transition: all 0.2s;
+    cursor: pointer;
+}
+
+.calendar-cell:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    transform: translateY(-1px);
+}
+
+.calendar-cell.empty {
+    border: none;
+    background: transparent;
+    cursor: default;
+}
+
+.calendar-cell.market-closed {
+    background: #f3f4f6;
+    border-color: #d1d5db;
+}
+
+.calendar-cell.no-data {
+    background: #fafafa;
+    opacity: 0.6;
+}
+
+.cell-day {
+    font-size: 13px;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 4px;
+}
+
+.cell-profit {
+    font-size: 11px;
+    font-weight: 600;
+    margin-bottom: 2px;
+}
+
+.cell-rate {
+    font-size: 10px;
+    font-weight: 500;
+}
+
+/* 年视图月份网格 */
+.months-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    padding: 10px;
+}
+
+.month-cell {
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 16px;
+    background: #fff;
+    text-align: center;
+    transition: all 0.2s;
+    cursor: pointer;
+}
+
+.month-cell:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    transform: translateY(-2px);
+}
+
+.month-cell.no-data {
+    background: #fafafa;
+    opacity: 0.6;
+}
+
+.month-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 10px;
+}
+
+.month-profit {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+.month-rate {
+    font-size: 13px;
+    font-weight: 500;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+    .calendar-cell {
+        padding: 4px;
+    }
+    
+    .cell-day {
+        font-size: 11px;
+    }
+    
+    .cell-profit {
+        font-size: 9px;
+    }
+    
+    .cell-rate {
+        font-size: 8px;
+    }
+    
+    .months-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}

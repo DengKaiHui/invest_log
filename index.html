@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 智能投资看板 (V9 美化版)</title>
+    <title>AI 投资看板</title>
     
     <!-- Element Plus -->
     <link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css" />
@@ -16,13 +16,14 @@
     <link rel="stylesheet" href="/src/styles/base.css" />
     <link rel="stylesheet" href="/src/styles/components.css" />
     <link rel="stylesheet" href="/src/styles/position.css" />
+    <link rel="stylesheet" href="/src/styles/profit-calendar.css" />
 </head>
 <body>
     <div id="app">
         <div class="navbar">
             <div class="navbar-content">
                 <div class="app-title">
-                    <span>🚀 My Portfolio</span>
+                    <span>🚀 Invest Board</span>
                 </div>
                 <div class="top-tools">
                     <span class="rate-badge" v-if="config.exchangeRate">
@@ -45,72 +46,8 @@
         <div class="container">
             <el-row :gutter="24" id="draggable-container">
                 <el-col :xs="24" :md="14" data-card="left">
-                    <!-- 持仓明细卡片 -->
-                    <el-card class="modern-card" data-card-id="left-0">
-                        <template #header>
-                            <div class="card-header-styled">
-                                <span>
-                                    <span class="drag-handle" title="拖动排序">⋮⋮</span>
-                                    📋 持仓明细
-                                </span>
-                                <div style="display: flex; gap: 8px;">
-                                    <el-button type="primary" size="small" @click="showAddRecordDialog = true" round>
-                                        <el-icon style="margin-right:4px"><Plus /></el-icon> 记一笔
-                                    </el-button>
-                                    <el-dropdown @command="handleDataCommand">
-                                        <el-button size="small" round>
-                                            数据 <el-icon class="el-icon--right"><arrow-down /></el-icon>
-                                        </el-button>
-                                        <template #dropdown>
-                                            <el-dropdown-menu>
-                                                <el-dropdown-item command="export">导出 CSV</el-dropdown-item>
-                                                <el-dropdown-item command="import">导入 CSV</el-dropdown-item>
-                                                <el-dropdown-item command="clear" divided>清空数据</el-dropdown-item>
-                                            </el-dropdown-menu>
-                                        </template>
-                                    </el-dropdown>
-                                </div>
-                            </div>
-                        </template>
-                        <el-table :data="records" style="width: 100%" height="380">
-                            <el-table-column prop="name" label="名称" width="100">
-                                <template #default="scope">
-                                    <span style="font-weight: 600;">{{ scope.row.name }}</span>
-                                </template>
-                            </el-table-column>
-                            <el-table-column prop="date" label="日期" width="110" sortable></el-table-column>
-                            
-                            <el-table-column prop="total" label="总投入($)" sortable>
-                                <template #default="scope">
-                                    <span v-if="isPrivacyMode">****</span>
-                                    <span v-else class="number-font" style="color:#059669">${{ scope.row.total }}</span>
-                                </template>
-                            </el-table-column>
-                            
-                            <el-table-column prop="price" label="均价($)">
-                                <template #default="scope">
-                                    <span v-if="isPrivacyMode">****</span>
-                                    <span v-else class="number-font">${{ scope.row.price }}</span>
-                                </template>
-                            </el-table-column>
-                            
-                            <el-table-column prop="shares" label="股数">
-                                <template #default="scope">
-                                    <span v-if="isPrivacyMode">****</span>
-                                    <span v-else class="number-font">{{ scope.row.shares }}</span>
-                                </template>
-                            </el-table-column>
-                            
-                            <el-table-column align="right" width="60">
-                                <template #default="scope">
-                                    <el-button size="small" type="danger" icon="Delete" circle text @click="deleteRecord(scope.$index)"></el-button>
-                                </template>
-                            </el-table-column>
-                        </el-table>
-                    </el-card>
-                    
                     <!-- 持仓盈亏卡片 -->
-                    <el-card class="modern-card position-table" data-card-id="left-1">
+                    <el-card class="modern-card position-table" data-card-id="left-0">
                         <template #header>
                             <div class="card-header-styled">
                                 <span>
@@ -122,7 +59,57 @@
                                 </el-button>
                             </div>
                         </template>
-                        <el-table :data="positionSummary" style="width: 100%" :default-sort="{prop: 'totalProfit', order: 'descending'}">
+                        
+                        <!-- 总市值折线图 -->
+                        <div v-loading="marketValueLoading" style="margin-bottom: 20px;">
+                            <div ref="marketValueChartDom" style="height: 200px; width: 100%;"></div>
+                        </div>
+                        
+                        <!-- 顶部汇总信息 -->
+                        <div class="position-summary-top">
+                            <div class="summary-item">
+                                <div class="summary-label">总市值</div>
+                                <div class="summary-value number-font">
+                                    <span v-if="isPrivacyMode">****</span>
+                                    <span v-else>${{ totalMarketValue }}</span>
+                                </div>
+                                <div class="summary-sub number-font">
+                                    <span v-if="isPrivacyMode">****</span>
+                                    <span v-else>≈ ¥{{ totalMarketValueCNY }}</span>
+                                </div>
+                            </div>
+                            <div class="summary-item">
+                                <div class="summary-label">总持仓成本</div>
+                                <div class="summary-value number-font">
+                                    <span v-if="isPrivacyMode">****</span>
+                                    <span v-else>${{ totalCost }}</span>
+                                </div>
+                                <div class="summary-sub number-font">
+                                    <span v-if="isPrivacyMode">****</span>
+                                    <span v-else>≈ ¥{{ totalCostCNY }}</span>
+                                </div>
+                            </div>
+                            <div class="summary-item">
+                                <div class="summary-label">总盈亏</div>
+                                <div class="summary-value number-font" :class="getProfitClass(totalProfitNum)">
+                                    <span v-if="isPrivacyMode">****</span>
+                                    <span v-else>{{ totalProfitNum >= 0 ? '+$' : '-$' }}{{ totalProfit.replace('-', '') }}</span>
+                                </div>
+                                <div class="summary-sub number-font" :class="getProfitClass(totalProfitNum)">
+                                    <span v-if="isPrivacyMode">****</span>
+                                    <span v-else>{{ totalProfitNum >= 0 ? '+' : '' }}¥{{ totalProfitCNY }}</span>
+                                </div>
+                            </div>
+                            <div class="summary-item">
+                                <div class="summary-label">总收益率</div>
+                                <div class="summary-value number-font" :class="getProfitClass(totalProfitNum)">
+                                    <span v-if="isPrivacyMode">****</span>
+                                    <span v-else>{{ totalProfitNum >= 0 ? '+' : '' }}{{ totalProfitRate }}%</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <el-table :data="positionSummary" style="width: 100%; margin-top: 20px;" :default-sort="{prop: 'totalProfit', order: 'descending'}">
                             <el-table-column label="名称/代码" width="180">
                                 <template #default="scope">
                                     <div>
@@ -183,69 +170,149 @@
                             </el-table-column>
                         </el-table>
                         
-                        <div style="margin-top: 20px; padding: 15px; background: #f9fafb; border-radius: 8px; display: flex; justify-content: space-around;">
-                            <div style="text-align: center;">
-                                <div style="font-size: 12px; color: #6b7280; margin-bottom: 5px;">总持仓成本</div>
-                                <div class="number-font" style="font-size: 18px; color: #1f2937;">
-                                    <span v-if="isPrivacyMode">****</span>
-                                    <span v-else>${{ totalCost }}</span>
-                                </div>
-                            </div>
-                            <div style="text-align: center;">
-                                <div style="font-size: 12px; color: #6b7280; margin-bottom: 5px;">总市值</div>
-                                <div class="number-font" style="font-size: 18px; color: #1f2937;">
-                                    <span v-if="isPrivacyMode">****</span>
-                                    <span v-else>${{ totalMarketValue }}</span>
-                                </div>
-                            </div>
-                            <div style="text-align: center;">
-                                <div style="font-size: 12px; color: #6b7280; margin-bottom: 5px;">总盈亏</div>
-                                <div class="number-font" style="font-size: 18px;" :class="getProfitClass(totalProfitNum)">
-                                    <span v-if="isPrivacyMode">****</span>
-                                    <span v-else>{{ totalProfitNum >= 0 ? '+$' : '-$' }}{{ totalProfit.replace('-', '') }}</span>
-                                </div>
-                            </div>
-                            <div style="text-align: center;">
-                                <div style="font-size: 12px; color: #6b7280; margin-bottom: 5px;">总收益率</div>
-                                <div class="number-font" style="font-size: 18px;" :class="getProfitClass(totalProfitNum)">
-                                    <span v-if="isPrivacyMode">****</span>
-                                    <span v-else>{{ totalProfitNum >= 0 ? '+' : '' }}{{ totalProfitRate }}%</span>
-                                </div>
-                            </div>
-                        </div>
-                        
                         <div style="margin-top: 10px; font-size: 12px; color: #6b7280; text-align: center;">
                             最后更新: {{ lastUpdateTime || '--' }}
+                        </div>
+                    </el-card>
+                    
+                    <!-- 收益日历卡片 -->
+                    <el-card class="modern-card profit-calendar-card" data-card-id="left-1">
+                        <template #header>
+                            <div class="card-header-styled">
+                                <span>
+                                    <span class="drag-handle" title="拖动排序">⋮⋮</span>
+                                    📅 收益日历
+                                </span>
+                                <div style="display: flex; gap: 8px;">
+                                    <el-button size="small" @click="recalculateProfits" :loading="recalculating">
+                                        🔄 重新计算
+                                    </el-button>
+                                    <el-button-group size="small">
+                                        <el-button :type="viewMode === 'month' ? 'primary' : ''" @click="switchViewMode('month')">月</el-button>
+                                        <el-button :type="viewMode === 'year' ? 'primary' : ''" @click="switchViewMode('year')">年</el-button>
+                                    </el-button-group>
+                                </div>
+                            </div>
+                        </template>
+                        
+                        <div v-loading="profitLoading" class="profit-calendar-content">
+                            <!-- 月视图 -->
+                            <div v-if="viewMode === 'month'" class="month-view">
+                                <!-- 标题栏 -->
+                                <div class="calendar-header">
+                                    <el-button size="small" circle @click="prevPeriod">◀</el-button>
+                                    <div class="calendar-title">{{ currentYearMonth }}</div>
+                                    <el-button size="small" circle @click="nextPeriod">▶</el-button>
+                                </div>
+                                
+                                <!-- 月收益汇总 -->
+                                <div class="month-summary">
+                                    <div class="summary-label">{{ currentMonth }}月收益 · USD</div>
+                                    <div class="summary-value" :class="getProfitClass(monthlyProfit ? monthlyProfit.profit : 0)">
+                                        <span v-if="isPrivacyMode">****</span>
+                                        <span v-else class="number-font">
+                                            {{ monthlyProfit && monthlyProfit.profit >= 0 ? '+' : '' }}{{ formatAmount(monthlyProfit ? monthlyProfit.profit : 0) }}
+                                        </span>
+                                    </div>
+                                    <div class="summary-rate" :class="getProfitClass(monthlyProfit ? monthlyProfit.profit : 0)">
+                                        <span v-if="isPrivacyMode">****</span>
+                                        <span v-else class="number-font">
+                                            收益率 {{ monthlyProfit && monthlyProfit.profit_rate >= 0 ? '+' : '' }}{{ (monthlyProfit ? monthlyProfit.profit_rate : 0).toFixed(2) }}%
+                                        </span>
+                                    </div>
+                                </div>
+                                
+                                <!-- 星期标题 -->
+                                <div class="weekdays">
+                                    <div class="weekday">日</div>
+                                    <div class="weekday">一</div>
+                                    <div class="weekday">二</div>
+                                    <div class="weekday">三</div>
+                                    <div class="weekday">四</div>
+                                    <div class="weekday">五</div>
+                                    <div class="weekday">六</div>
+                                </div>
+                                
+                                <!-- 日历格子 -->
+                                <div class="calendar-grid">
+                                    <div 
+                                        v-for="(item, index) in dailyProfits" 
+                                        :key="index"
+                                        class="calendar-cell"
+                                        :class="{
+                                            'empty': !item,
+                                            'market-closed': item && item.isMarketClosed,
+                                            'no-data': item && !item.hasData
+                                        }"
+                                    >
+                                        <template v-if="item">
+                                            <div class="cell-day">{{ item.day }}</div>
+                                            <div v-if="!isPrivacyMode" class="cell-profit" :class="getProfitClass(item.profit)">
+                                                {{ item.profit >= 0 ? '+' : '' }}{{ formatAmount(item.profit) }}
+                                            </div>
+                                            <div v-else class="cell-profit profit-neutral">****</div>
+                                            <div v-if="!isPrivacyMode" class="cell-rate" :class="getProfitClass(item.profit)">
+                                                {{ item.profitRate >= 0 ? '+' : '' }}{{ item.profitRate.toFixed(2) }}%
+                                            </div>
+                                            <div v-else class="cell-rate profit-neutral">****</div>
+                                        </template>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- 年视图 -->
+                            <div v-if="viewMode === 'year'" class="year-view">
+                                <!-- 标题栏 -->
+                                <div class="calendar-header">
+                                    <el-button size="small" circle @click="prevPeriod">◀</el-button>
+                                    <div class="calendar-title">{{ currentYear }}</div>
+                                    <el-button size="small" circle @click="nextPeriod">▶</el-button>
+                                </div>
+                                
+                                <!-- 年收益汇总 -->
+                                <div class="year-summary">
+                                    <div class="summary-label">{{ currentYear }}年收益 · USD</div>
+                                    <div class="summary-value" :class="getProfitClass(yearlyProfit ? yearlyProfit.profit : 0)">
+                                        <span v-if="isPrivacyMode">****</span>
+                                        <span v-else class="number-font">
+                                            {{ yearlyProfit && yearlyProfit.profit >= 0 ? '+' : '' }}{{ formatAmount(yearlyProfit ? yearlyProfit.profit : 0) }}
+                                        </span>
+                                    </div>
+                                    <div class="summary-rate" :class="getProfitClass(yearlyProfit ? yearlyProfit.profit : 0)">
+                                        <span v-if="isPrivacyMode">****</span>
+                                        <span v-else class="number-font">
+                                            收益率 {{ yearlyProfit && yearlyProfit.profit_rate >= 0 ? '+' : '' }}{{ (yearlyProfit ? yearlyProfit.profit_rate : 0).toFixed(2) }}%
+                                        </span>
+                                    </div>
+                                </div>
+                                
+                                <!-- 月份网格 -->
+                                <div class="months-grid">
+                                    <div 
+                                        v-for="item in monthlyProfits" 
+                                        :key="item.month"
+                                        class="month-cell"
+                                        :class="{ 'no-data': !item.hasData }"
+                                    >
+                                        <div class="month-label">{{ item.monthStr }}</div>
+                                        <div v-if="!isPrivacyMode" class="month-profit" :class="getProfitClass(item.profit)">
+                                            {{ item.profit >= 0 ? '+' : '' }}{{ formatAmount(item.profit) }}
+                                        </div>
+                                        <div v-else class="month-profit profit-neutral">****</div>
+                                        <div v-if="!isPrivacyMode" class="month-rate" :class="getProfitClass(item.profit)">
+                                            {{ item.profitRate >= 0 ? '+' : '' }}{{ item.profitRate.toFixed(2) }}%
+                                        </div>
+                                        <div v-else class="month-rate profit-neutral">****</div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </el-card>
                 </el-col>
 
                 <el-col :xs="24" :md="10" data-card="right">
-                    <!-- 总资产卡片 -->
-                    <el-card class="modern-card" data-card-id="right-0">
-                        <template #header>
-                            <div class="card-header-styled">
-                                <span>
-                                    <span class="drag-handle" title="拖动排序">⋮⋮</span>
-                                    💎 总资产
-                                </span>
-                            </div>
-                        </template>
-                        <div class="asset-board">
-                            <div class="asset-label">Total Assets (USD)</div>
-                            <div class="asset-main-value number-font">
-                                <span v-if="isPrivacyMode">****</span>
-                                <span v-else>${{ totalAssetUSD }}</span>
-                            </div>
-                            <div class="asset-sub-value number-font">
-                                <span v-if="isPrivacyMode">****</span>
-                                <span v-else>≈ ¥{{ totalAssetCNY }} CNY</span>
-                            </div>
-                        </div>
-                    </el-card>
-
                     <!-- 资产分布卡片 -->
-                    <el-card class="modern-card" data-card-id="right-1">
+                    <el-card class="modern-card" data-card-id="right-0">
                         <template #header>
                             <div class="card-header-styled">
                                 <span>
@@ -258,6 +325,70 @@
                             </div>
                         </template>
                         <div ref="chartDom" style="height: 350px; width: 100%;"></div>
+                    </el-card>
+                    
+                    <!-- 交易记录卡片 -->
+                    <el-card class="modern-card" data-card-id="right-1">
+                        <template #header>
+                            <div class="card-header-styled">
+                                <span>
+                                    <span class="drag-handle" title="拖动排序">⋮⋮</span>
+                                    📋 交易记录
+                                </span>
+                                <div style="display: flex; gap: 8px;">
+                                    <el-button type="primary" size="small" @click="showAddRecordDialog = true" round>
+                                        <el-icon style="margin-right:4px"><Plus /></el-icon> 记一笔
+                                    </el-button>
+                                    <el-dropdown @command="handleDataCommand">
+                                        <el-button size="small" round>
+                                            数据 <el-icon class="el-icon--right"><arrow-down /></el-icon>
+                                        </el-button>
+                                        <template #dropdown>
+                                            <el-dropdown-menu>
+                                                <el-dropdown-item command="export">导出 CSV</el-dropdown-item>
+                                                <el-dropdown-item command="import">导入 CSV</el-dropdown-item>
+                                                <el-dropdown-item command="clear" divided>清空数据</el-dropdown-item>
+                                            </el-dropdown-menu>
+                                        </template>
+                                    </el-dropdown>
+                                </div>
+                            </div>
+                        </template>
+                        <el-table :data="records" style="width: 100%" height="380">
+                            <el-table-column prop="name" label="名称" width="100">
+                                <template #default="scope">
+                                    <span style="font-weight: 600;">{{ scope.row.name }}</span>
+                                </template>
+                            </el-table-column>
+                            <el-table-column prop="date" label="日期" width="110" sortable></el-table-column>
+                            
+                            <el-table-column prop="total" label="总投入($)" sortable>
+                                <template #default="scope">
+                                    <span v-if="isPrivacyMode">****</span>
+                                    <span v-else class="number-font" style="color:#059669">${{ scope.row.total }}</span>
+                                </template>
+                            </el-table-column>
+                            
+                            <el-table-column prop="price" label="均价($)">
+                                <template #default="scope">
+                                    <span v-if="isPrivacyMode">****</span>
+                                    <span v-else class="number-font">${{ scope.row.price }}</span>
+                                </template>
+                            </el-table-column>
+                            
+                            <el-table-column prop="shares" label="股数">
+                                <template #default="scope">
+                                    <span v-if="isPrivacyMode">****</span>
+                                    <span v-else class="number-font">{{ scope.row.shares }}</span>
+                                </template>
+                            </el-table-column>
+                            
+                            <el-table-column align="right" width="60">
+                                <template #default="scope">
+                                    <el-button size="small" type="danger" icon="Delete" circle text @click="deleteRecord(scope.$index)"></el-button>
+                                </template>
+                            </el-table-column>
+                        </el-table>
                     </el-card>
                 </el-col>
             </el-row>
@@ -428,6 +559,8 @@
     <script type="module" src="/src/composables/useRecords.js"></script>
     <script type="module" src="/src/composables/usePosition.js"></script>
     <script type="module" src="/src/composables/useChart.js"></script>
+    <script type="module" src="/src/composables/useProfitCalendar.js"></script>
+    <script type="module" src="/src/composables/useMarketValueChart.js"></script>
 
     <!-- 主应用 -->
     <script type="module" src="/src/app.js"></script>

@@ -12,7 +12,7 @@ import multer from 'multer';
 import path from 'path';
 import cron from 'node-cron';
 import { fileURLToPath } from 'url';
-import { initDatabase, transactionDB, configDB, priceCacheDB } from './database.js';
+import { initDatabase, transactionDB, configDB, priceCacheDB, dailyProfitDB, monthlyProfitDB, yearlyProfitDB, dailyPriceSnapshotDB } from './database.js';
 import { importCSV, exportCSV, validateCSV } from './csv-handler.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -399,6 +399,133 @@ app.post('/api/config', (req, res) => {
 // ================== 股票价格 API ==================
 
 /**
+ * 判断是否为美股休市日
+ * 简化版：周末休市
+ */
+function isMarketClosed(dateStr) {
+    const date = new Date(dateStr);
+    const day = date.getDay();
+    // 0 = Sunday, 6 = Saturday
+    return day === 0 || day === 6;
+}
+
+/**
+ * 计算当天收益
+ * 优化逻辑：
+ * 1. 使用每日价格快照计算总市值
+ * 2. 公式：T日收益 = T日总市值 - (T-1)日总市值 - T日新增投入
+ * 3. 收益率 = T日收益 / (T-1)日总市值 * 100%
+ */
+async function calculateDailyProfit(date) {
+    const summary = transactionDB.getSummary();
+    
+    if (summary.length === 0) {
+        return { profit: 0, profitRate: 0, totalValue: 0 };
+    }
+    
+    // 1. 计算当日总市值（使用当日价格快照）
+    let totalMarketValue = 0;
+    const priceSnapshots = dailyPriceSnapshotDB.getByDate(date);
+    const priceMap = {};
+    priceSnapshots.forEach(item => {
+        priceMap[item.symbol] = item.price;
+    });
+    
+    // 计算截至该日期的持仓总市值
+    for (const item of summary) {
+        const symbol = item.symbol;
+        const shares = item.total_shares;
+        
+        // 优先使用当日价格快照
+        if (priceMap[symbol]) {
+            totalMarketValue += shares * priceMap[symbol];
+        } else {
+            // 如果没有快照，使用最近的价格快照或成本价
+            const priceCache = priceCacheDB.get(symbol);
+            totalMarketValue += shares * (priceCache?.price || item.avg_price);
+        }
+    }
+    
+    // 2. 计算当天新增投入（从 transactions 表实时计算）
+    const newInvestment = transactionDB.getNewInvestmentByDate(date);
+    
+    // 3. 获取前一日总市值
+    const prevDayData = dailyProfitDB.getLatestBefore(date);
+    let prevTotalValue = 0;
+    
+    if (prevDayData) {
+        // 有历史收益记录，使用前一日的总市值
+        prevTotalValue = prevDayData.total_value;
+    } else {
+        // 第一条记录，前一日市值 = 截至前一日的总成本
+        const prevDate = getPreviousDate(date);
+        const costUpToPrevDate = transactionDB.getTotalCostUpToDate(prevDate);
+        prevTotalValue = costUpToPrevDate;
+    }
+    
+    // 4. 计算收益和收益率
+    const profit = totalMarketValue - prevTotalValue - newInvestment;
+    const profitRate = prevTotalValue > 0 ? (profit / prevTotalValue) * 100 : 0;
+    
+    return {
+        profit: parseFloat(profit.toFixed(2)),
+        profitRate: parseFloat(profitRate.toFixed(2)),
+        totalValue: parseFloat(totalMarketValue.toFixed(2))
+    };
+}
+
+/**
+ * 获取前一天的日期
+ */
+function getPreviousDate(dateStr) {
+    const date = new Date(dateStr);
+    date.setDate(date.getDate() - 1);
+    return date.toISOString().split('T')[0];
+}
+
+/**
+ * 获取总市值历史数据（从12.3开始）
+ */
+app.get('/api/marketvalue/history', (req, res) => {
+    try {
+        const { startDate, endDate } = req.query;
+        const start = startDate || '2025-12-03';
+        const end = endDate || new Date().toISOString().split('T')[0];
+        
+        const records = dailyProfitDB.getRange(start, end);
+        
+        const history = records.map(record => ({
+            date: record.date,
+            totalValue: record.total_value
+        }));
+        
+        res.json({
+            success: true,
+            data: history
+        });
+    } catch (error) {
+        console.error('获取总市值历史失败:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
+/**
+ * 计算并保存当天收益
+ */
+async function saveDailyProfit(date) {
+    const { profit, profitRate, totalValue } = await calculateDailyProfit(date);
+    
+    dailyProfitDB.set(date, profit, profitRate, totalValue);
+    
+    return { profit, profitRate, totalValue };
+}
+
+// 月收益和年收益已改为实时计算，不再需要 updateMonthlyProfit 和 updateYearlyProfit 函数
+
+/**
  * 判断缓存是否在今天早上8点之前
  * @returns {boolean} true表示需要刷新
  */
@@ -613,6 +740,275 @@ app.post('/api/refresh', async (req, res) => {
     }
 });
 
+// ================== 收益日历 API ==================
+
+// 获取某一天的收益
+app.get('/api/profits/daily/:date', (req, res) => {
+    try {
+        const { date } = req.params;
+        const profit = dailyProfitDB.get(date);
+        
+        res.json({
+            success: true,
+            data: profit || { date, profit: 0, profit_rate: 0, total_value: 0 }
+        });
+    } catch (error) {
+        console.error('获取日收益失败:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
+// 获取某个月的所有日收益
+app.get('/api/profits/daily/month/:yearMonth', (req, res) => {
+    try {
+        const { yearMonth } = req.params;
+        const profits = dailyProfitDB.getByMonth(yearMonth);
+        
+        res.json({
+            success: true,
+            data: profits
+        });
+    } catch (error) {
+        console.error('获取月度日收益失败:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
+// 获取某个月的收益汇总
+app.get('/api/profits/monthly/:month', (req, res) => {
+    try {
+        const { month } = req.params;
+        const profit = monthlyProfitDB.get(month);
+        
+        res.json({
+            success: true,
+            data: profit || { month, profit: 0, profit_rate: 0, total_value: 0 }
+        });
+    } catch (error) {
+        console.error('获取月收益失败:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
+// 获取某一年的所有月收益
+app.get('/api/profits/monthly/year/:year', (req, res) => {
+    try {
+        const { year } = req.params;
+        const profits = monthlyProfitDB.getByYear(year);
+        
+        res.json({
+            success: true,
+            data: profits
+        });
+    } catch (error) {
+        console.error('获取年度月收益失败:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
+// 获取某一年的收益汇总
+app.get('/api/profits/yearly/:year', (req, res) => {
+    try {
+        const { year } = req.params;
+        const profit = yearlyProfitDB.get(year);
+        
+        res.json({
+            success: true,
+            data: profit || { year, profit: 0, profit_rate: 0, total_value: 0 }
+        });
+    } catch (error) {
+        console.error('获取年收益失败:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
+// 获取所有年收益
+app.get('/api/profits/yearly', (req, res) => {
+    try {
+        const profits = yearlyProfitDB.getAll();
+        
+        res.json({
+            success: true,
+            data: profits
+        });
+    } catch (error) {
+        console.error('获取所有年收益失败:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
+// 手动计算并保存当天收益
+app.post('/api/profits/calculate', async (req, res) => {
+    try {
+        const { date } = req.body;
+        const targetDate = date || new Date().toISOString().split('T')[0];
+        
+        const result = await saveDailyProfit(targetDate);
+        
+        res.json({
+            success: true,
+            data: result,
+            message: '收益计算完成'
+        });
+    } catch (error) {
+        console.error('计算收益失败:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
+// 清空所有收益数据
+app.delete('/api/profits', (req, res) => {
+    try {
+        const dailyCount = dailyProfitDB.deleteAll();
+        
+        res.json({
+            success: true,
+            message: '收益数据已清空',
+            deleted: {
+                daily: dailyCount
+            }
+        });
+    } catch (error) {
+        console.error('清空收益数据失败:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
+// 手动保存价格快照（用于初始化或补充数据）
+app.post('/api/prices/snapshot', async (req, res) => {
+    try {
+        const { date } = req.body;
+        const targetDate = date || new Date().toISOString().split('T')[0];
+        
+        const symbols = getAllSymbols();
+        if (symbols.length === 0) {
+            return res.json({
+                success: false,
+                message: '暂无持仓数据'
+            });
+        }
+        
+        console.log(`保存 ${targetDate} 的价格快照...`);
+        
+        const priceSnapshot = {};
+        let successCount = 0;
+        let failCount = 0;
+        
+        for (const symbol of symbols) {
+            // 先尝试从价格缓存获取
+            const cached = priceCacheDB.get(symbol);
+            if (cached && cached.price > 0) {
+                priceSnapshot[symbol] = cached.price;
+                successCount++;
+                console.log(`  ✓ ${symbol}: $${cached.price} (缓存)`);
+            } else {
+                // 如果缓存没有，从API获取
+                const price = await fetchStockPrice(symbol, 2);
+                if (price !== null) {
+                    priceSnapshot[symbol] = price;
+                    successCount++;
+                } else {
+                    failCount++;
+                }
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+        }
+        
+        // 保存快照
+        if (Object.keys(priceSnapshot).length > 0) {
+            dailyPriceSnapshotDB.setBatch(targetDate, priceSnapshot);
+        }
+        
+        res.json({
+            success: true,
+            message: '价格快照保存完成',
+            date: targetDate,
+            saved: successCount,
+            failed: failCount,
+            snapshot: priceSnapshot
+        });
+    } catch (error) {
+        console.error('保存价格快照失败:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
+// 重新计算所有收益（从第一笔交易开始到今天）
+app.post('/api/profits/recalculate', async (req, res) => {
+    try {
+        // 1. 清空现有数据
+        dailyProfitDB.deleteAll();
+        
+        // 2. 设置计算起始日期为 2025-12-03
+        const startDate = new Date('2025-12-03');
+        const endDate = new Date(); // 今天
+        
+        console.log(`重新计算收益：2025-12-03 ~ ${endDate.toISOString().split('T')[0]}`);
+        
+        // 3. 逐日计算收益
+        const calculatedDates = [];
+        let currentDate = new Date(startDate);
+        
+        while (currentDate <= endDate) {
+            const dateStr = currentDate.toISOString().split('T')[0];
+            
+            try {
+                await saveDailyProfit(dateStr);
+                calculatedDates.push(dateStr);
+                console.log(`  ✓ ${dateStr}`);
+            } catch (error) {
+                console.error(`  ✗ ${dateStr}: ${error.message}`);
+            }
+            
+            // 下一天
+            currentDate.setDate(currentDate.getDate() + 1);
+        }
+        
+        res.json({
+            success: true,
+            message: '收益重新计算完成',
+            calculated: calculatedDates.length,
+            dateRange: {
+                start: '2025-12-03',
+                end: endDate.toISOString().split('T')[0]
+            }
+        });
+    } catch (error) {
+        console.error('重新计算收益失败:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
 // ================== 启动服务器 ==================
 
 /**
@@ -624,7 +1020,7 @@ function getAllSymbols() {
 }
 
 /**
- * 定时任务：每天早上7点自动刷新所有持仓股票价格
+ * 定时任务：每天早上7点自动刷新所有持仓股票价格、保存快照并计算收益
  */
 async function scheduledPriceRefresh() {
     console.log('\n=== 定时刷新股票价格 ===');
@@ -641,11 +1037,14 @@ async function scheduledPriceRefresh() {
     
     let successCount = 0;
     let failCount = 0;
+    const today = new Date().toISOString().split('T')[0];
+    const priceSnapshot = {};
     
     for (const symbol of symbols) {
         const price = await fetchStockPrice(symbol, 2);
         if (price !== null) {
             successCount++;
+            priceSnapshot[symbol] = price;
         } else {
             failCount++;
         }
@@ -654,6 +1053,33 @@ async function scheduledPriceRefresh() {
     }
     
     console.log(`刷新完成: 成功 ${successCount} 个，失败 ${failCount} 个`);
+    
+    // 保存价格快照到数据库
+    if (Object.keys(priceSnapshot).length > 0) {
+        dailyPriceSnapshotDB.setBatch(today, priceSnapshot);
+        console.log(`✓ 已保存今日价格快照: ${today}`);
+    }
+    
+    // 计算并保存当天收益（从12.3开始）
+    const startDate = new Date('2025-12-03');
+    const currentDate = new Date(today);
+    
+    if (currentDate >= startDate) {
+        console.log('\n=== 计算当天收益 ===');
+        try {
+            const profitResult = await saveDailyProfit(today);
+            const isMarketClosed = isMarketClosed(today);
+            console.log(`日期: ${today}`);
+            console.log(`收益: $${profitResult.profit} (${profitResult.profitRate}%)`);
+            console.log(`总市值: $${profitResult.totalValue}`);
+            console.log(`市场状态: ${isMarketClosed ? '休市' : '开市'}`);
+        } catch (error) {
+            console.error('计算收益失败:', error);
+        }
+    } else {
+        console.log('\n⏸ 收益计算从2025-12-03开始，今天暂不计算');
+    }
+    
     console.log('========================\n');
 }
 

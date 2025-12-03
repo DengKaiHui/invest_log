@@ -5,8 +5,11 @@ import { useConfig } from './composables/useConfig.js';
 import { useRecords } from './composables/useRecords.js';
 import { usePosition } from './composables/usePosition.js';
 import { useChart } from './composables/useChart.js';
+import { useProfitCalendar } from './composables/useProfitCalendar.js';
+import { useMarketValueChart } from './composables/useMarketValueChart.js';
 import { storage, STORAGE_KEYS } from './utils/storage.js';
 import { formatCurrency } from './utils/formatter.js';
+import { recalculateAllProfits } from './utils/api.js';
 
 const { createApp, ref, computed, onMounted, nextTick } = Vue;
 
@@ -17,6 +20,9 @@ const App = {
         
         // 记一笔弹框控制
         const showAddRecordDialog = ref(false);
+        
+        // 重新计算收益的加载状态
+        const recalculating = ref(false);
         
         // 配置管理
         const configModule = useConfig(Vue);
@@ -41,15 +47,34 @@ const App = {
         const positionModule = usePosition(Vue, recordsModule.records);
         refreshPricesCallback = positionModule.refreshPrices;
         
-        // 计算总资产
-        const totalAssetUSD = computed(() => {
-            const sum = recordsModule.records.value.reduce((acc, item) => acc + item.total, 0);
-            return formatCurrency(sum);
+        // 收益日历管理
+        const profitCalendarModule = useProfitCalendar(Vue);
+        
+        // 总市值图表管理
+        const marketValueChartModule = useMarketValueChart(Vue);
+        
+        // 计算持仓盈亏的人民币金额
+        const totalCostCNY = computed(() => {
+            const costNum = positionModule.positionSummary.value.reduce((acc, pos) => {
+                const cost = pos.totalCost || 0;
+                return acc + Number(cost);
+            }, 0);
+            return formatCurrency(costNum * (configModule.config.value.exchangeRate || 7.25));
         });
         
-        const totalAssetCNY = computed(() => {
-            const sum = recordsModule.records.value.reduce((acc, item) => acc + item.total, 0);
+        const totalMarketValueCNY = computed(() => {
+            const sum = positionModule.positionSummary.value.reduce((acc, pos) => {
+                if (pos.marketValue === '--') return acc;
+                const val = Number(pos.marketValue.replace(/,/g, ''));
+                return acc + val;
+            }, 0);
             return formatCurrency(sum * (configModule.config.value.exchangeRate || 7.25));
+        });
+        
+        const totalProfitCNY = computed(() => {
+            const profitNum = positionModule.totalProfitNum.value;
+            const profitCNY = profitNum * (configModule.config.value.exchangeRate || 7.25);
+            return formatCurrency(Math.abs(profitCNY));
         });
         
         // 切换隐私模式
@@ -76,6 +101,30 @@ const App = {
                 case 'clear':
                     recordsModule.clearAll();
                     break;
+            }
+        }
+        
+        // 重新计算所有收益
+        async function recalculateProfits() {
+            try {
+                recalculating.value = true;
+                
+                const result = await recalculateAllProfits();
+                
+                ElementPlus.ElMessage.success({
+                    message: `收益重新计算完成！已计算 ${result.calculated} 天的数据`,
+                    duration: 3000
+                });
+                
+                // 重新加载收益日历和总市值图表
+                await profitCalendarModule.loadData();
+                await marketValueChartModule.loadMarketValueData();
+                
+            } catch (error) {
+                console.error('重新计算收益失败:', error);
+                ElementPlus.ElMessage.error('重新计算收益失败: ' + error.message);
+            } finally {
+                recalculating.value = false;
             }
         }
         
@@ -160,6 +209,15 @@ const App = {
                 if (recordsModule.records.value.length > 0) {
                     setTimeout(() => positionModule.loadPrices(), 500);
                 }
+                
+                // 加载收益日历数据
+                setTimeout(() => profitCalendarModule.loadData(), 800);
+                
+                // 初始化并加载总市值图表
+                setTimeout(() => {
+                    marketValueChartModule.initMarketValueChart();
+                    marketValueChartModule.loadMarketValueData();
+                }, 1000);
             });
         });
         
@@ -176,14 +234,24 @@ const App = {
             // 图表相关
             ...chartModule,
             
+            // 收益日历相关
+            ...profitCalendarModule,
+            profitLoading: profitCalendarModule.loading,
+            recalculating,
+            recalculateProfits,
+            
+            // 总市值图表相关
+            ...marketValueChartModule,
+            
             // 其他
             isPrivacyMode,
             togglePrivacy,
             showAddRecordDialog,
             addRecordAndClose,
             handleDataCommand,
-            totalAssetUSD,
-            totalAssetCNY
+            totalCostCNY,
+            totalMarketValueCNY,
+            totalProfitCNY
         };
     }
 };

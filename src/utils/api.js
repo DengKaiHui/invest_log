@@ -393,3 +393,185 @@ export async function analyzeImageWithOpenAI(base64Full, config) {
     const data = await response.json();
     return data.choices[0].message.content;
 }
+
+// ================== 收益日历 API ==================
+
+// 获取某一天的收益
+export async function fetchDailyProfit(date) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/profits/daily/${date}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            return data.data;
+        }
+        throw new Error(data.message || '获取日收益失败');
+    } catch (error) {
+        console.error('获取日收益失败:', error);
+        throw error;
+    }
+}
+
+// 获取某个月的所有日收益
+export async function fetchMonthlyDailyProfits(yearMonth) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/profits/daily/month/${yearMonth}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            return data.data;
+        }
+        throw new Error(data.message || '获取月度日收益失败');
+    } catch (error) {
+        console.error('获取月度日收益失败:', error);
+        throw error;
+    }
+}
+
+// 获取某个月的收益汇总
+export async function fetchMonthlyProfit(month) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/profits/monthly/${month}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            return data.data;
+        }
+        throw new Error(data.message || '获取月收益失败');
+    } catch (error) {
+        console.error('获取月收益失败:', error);
+        throw error;
+    }
+}
+
+// 获取某一年的所有月收益
+export async function fetchYearlyMonthlyProfits(year) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/profits/monthly/year/${year}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            return data.data;
+        }
+        throw new Error(data.message || '获取年度月收益失败');
+    } catch (error) {
+        console.error('获取年度月收益失败:', error);
+        throw error;
+    }
+}
+
+// 获取某一年的收益汇总
+export async function fetchYearlyProfit(year) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/profits/yearly/${year}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            return data.data;
+        }
+        throw new Error(data.message || '获取年收益失败');
+    } catch (error) {
+        console.error('获取年收益失败:', error);
+        throw error;
+    }
+}
+
+// 获取所有年收益
+export async function fetchAllYearlyProfits() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/profits/yearly`);
+        const data = await response.json();
+        
+        if (data.success) {
+            return data.data;
+        }
+        throw new Error(data.message || '获取所有年收益失败');
+    } catch (error) {
+        console.error('获取所有年收益失败:', error);
+        throw error;
+    }
+}
+
+// 手动计算并保存当天收益
+export async function calculateProfit(date = null) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/profits/calculate`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ date })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            return data.data;
+        }
+        throw new Error(data.message || '计算收益失败');
+    } catch (error) {
+        console.error('计算收益失败:', error);
+        throw error;
+    }
+}
+
+// 清空所有收益数据
+export async function clearAllProfits() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/profits`, {
+            method: 'DELETE'
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            return data.deleted;
+        }
+        throw new Error(data.message || '清空收益数据失败');
+    } catch (error) {
+        console.error('清空收益数据失败:', error);
+        throw error;
+    }
+}
+
+// 重新计算所有收益
+export async function recalculateAllProfits() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/profits/recalculate`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            return {
+                calculated: data.calculated,
+                dateRange: data.dateRange
+            };
+        }
+        throw new Error(data.message || '重新计算收益失败');
+    } catch (error) {
+        console.error('重新计算收益失败:', error);
+        throw error;
+    }
+}
+
+// 获取总市值历史数据
+export async function fetchMarketValueHistory(startDate = '2025-12-03', endDate = null) {
+    try {
+        const end = endDate || new Date().toISOString().split('T')[0];
+        const response = await fetch(`${API_BASE_URL}/marketvalue/history?startDate=${startDate}&endDate=${end}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            return data.data;
+        }
+        throw new Error(data.message || '获取总市值历史失败');
+    } catch (error) {
+        console.error('获取总市值历史失败:', error);
+        throw error;
+    }
+}

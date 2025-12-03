@@ -109,12 +109,12 @@
 
 /* 盈亏颜色 */
 .profit-positive { 
-    color: #10b981; 
+    color: #dc2626; 
     font-weight: 600; 
 }
 
 .profit-negative { 
-    color: #ef4444; 
+    color: #16a34a; 
     font-weight: 600; 
 }
 

@@ -5,6 +5,41 @@
     overflow: hidden;
 }
 
+/* 顶部汇总信息 */
+.position-summary-top {
+    display: flex;
+    justify-content: space-around;
+    padding: 20px;
+    background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
+    border-radius: 12px;
+    margin-bottom: 0;
+}
+
+.position-summary-top .summary-item {
+    text-align: center;
+    flex: 1;
+}
+
+.position-summary-top .summary-label {
+    font-size: 12px;
+    color: #6b7280;
+    margin-bottom: 8px;
+    font-weight: 500;
+}
+
+.position-summary-top .summary-value {
+    font-size: 22px;
+    font-weight: 700;
+    color: #1f2937;
+    margin-bottom: 4px;
+}
+
+.position-summary-top .summary-sub {
+    font-size: 13px;
+    color: #6b7280;
+    font-weight: 500;
+}
+
 .position-table .el-table {
     background: #ffffff !important;
 }
@@ -103,11 +138,11 @@
 
 /* 盈亏颜色样式 */
 .profit-positive {
-    color: #16a34a !important;
+    color: #dc2626 !important;
 }
 
 .profit-negative {
-    color: #dc2626 !important;
+    color: #16a34a !important;
 }
 
 .profit-neutral {
