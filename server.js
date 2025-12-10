@@ -1068,11 +1068,11 @@ async function scheduledPriceRefresh() {
         console.log('\n=== 计算当天收益 ===');
         try {
             const profitResult = await saveDailyProfit(today);
-            const isMarketClosed = isMarketClosed(today);
+            const marketClosed = isMarketClosed(today);
             console.log(`日期: ${today}`);
             console.log(`收益: $${profitResult.profit} (${profitResult.profitRate}%)`);
             console.log(`总市值: $${profitResult.totalValue}`);
-            console.log(`市场状态: ${isMarketClosed ? '休市' : '开市'}`);
+            console.log(`市场状态: ${marketClosed ? '休市' : '开市'}`);
         } catch (error) {
             console.error('计算收益失败:', error);
         }
