@@ -1023,18 +1023,25 @@ function getAllSymbols() {
  * 定时任务：每天早上7点自动刷新所有持仓股票价格、保存快照并计算收益
  */
 async function scheduledPriceRefresh() {
-    console.log('\n=== 定时刷新股票价格 ===');
-    console.log(`时间: ${new Date().toLocaleString('zh-CN')}`);
+    const startTime = Date.now();
+    console.log('\n' + '='.repeat(60));
+    console.log('📊 定时任务：刷新股票价格并计算收益');
+    console.log('='.repeat(60));
+    console.log(`⏰ 执行时间: ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}`);
     
     const symbols = getAllSymbols();
     
     if (symbols.length === 0) {
-        console.log('暂无持仓数据，跳过刷新');
+        console.log('⚠️  暂无持仓数据，跳过刷新');
+        console.log('='.repeat(60) + '\n');
         return;
     }
     
-    console.log(`需要刷新的股票: ${symbols.join(', ')}`);
+    console.log(`📈 持仓股票 (${symbols.length}): ${symbols.join(', ')}`);
+    console.log('');
     
+    // 第一步：刷新价格
+    console.log('【步骤 1/3】刷新股票价格...');
     let successCount = 0;
     let failCount = 0;
     const today = new Date().toISOString().split('T')[0];
@@ -1052,35 +1059,50 @@ async function scheduledPriceRefresh() {
         await new Promise(resolve => setTimeout(resolve, 1000));
     }
     
-    console.log(`刷新完成: 成功 ${successCount} 个，失败 ${failCount} 个`);
+    console.log(`✓ 价格刷新完成: 成功 ${successCount}/${symbols.length}, 失败 ${failCount}/${symbols.length}`);
+    console.log('');
     
-    // 保存价格快照到数据库
+    // 第二步：保存价格快照
+    console.log('【步骤 2/3】保存价格快照...');
     if (Object.keys(priceSnapshot).length > 0) {
         dailyPriceSnapshotDB.setBatch(today, priceSnapshot);
-        console.log(`✓ 已保存今日价格快照: ${today}`);
+        console.log(`✓ 已保存价格快照到数据库: ${today}`);
+        console.log(`  - 快照数量: ${Object.keys(priceSnapshot).length}`);
+    } else {
+        console.log('⚠️  无价格数据可保存');
     }
+    console.log('');
     
-    // 计算并保存当天收益（从12.3开始）
+    // 第三步：计算并保存收益
     const startDate = new Date('2025-12-03');
     const currentDate = new Date(today);
     
     if (currentDate >= startDate) {
-        console.log('\n=== 计算当天收益 ===');
+        console.log('【步骤 3/3】计算并保存当天收益...');
         try {
             const profitResult = await saveDailyProfit(today);
             const marketClosed = isMarketClosed(today);
-            console.log(`日期: ${today}`);
-            console.log(`收益: $${profitResult.profit} (${profitResult.profitRate}%)`);
-            console.log(`总市值: $${profitResult.totalValue}`);
-            console.log(`市场状态: ${marketClosed ? '休市' : '开市'}`);
+            
+            console.log(`✓ 收益计算完成并已保存到数据库`);
+            console.log(`  - 日期: ${today} ${marketClosed ? '(休市)' : '(开市)'}`);
+            console.log(`  - 收益: $${profitResult.profit} (${profitResult.profitRate >= 0 ? '+' : ''}${profitResult.profitRate}%)`);
+            console.log(`  - 总市值: $${profitResult.totalValue.toLocaleString('en-US', { minimumFractionDigits: 2 })}`);
+            
+            // 提示前端刷新
+            console.log('');
+            console.log('💡 提示: 前端将在下次刷新周期（10分钟内）自动更新收益日历和折线图');
         } catch (error) {
-            console.error('计算收益失败:', error);
+            console.error('✗ 计算收益失败:', error);
         }
     } else {
-        console.log('\n⏸ 收益计算从2025-12-03开始，今天暂不计算');
+        console.log('【步骤 3/3】跳过收益计算');
+        console.log(`⏸  收益计算从2025-12-03开始，当前日期 ${today} 早于起始日期`);
     }
     
-    console.log('========================\n');
+    const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+    console.log('');
+    console.log(`⏱️  总耗时: ${duration}秒`);
+    console.log('='.repeat(60) + '\n');
 }
 
 // 初始化定时任务：每天早上7点（北京时间）

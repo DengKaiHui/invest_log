@@ -128,6 +128,22 @@ const App = {
             }
         }
         
+        // 刷新图表和收益数据（从数据库获取最新数据）
+        async function refreshChartAndProfit() {
+            try {
+                console.log('📊 刷新收益数据和折线图...');
+                await Promise.all([
+                    profitCalendarModule.loadData(),
+                    marketValueChartModule.loadMarketValueData()
+                ]);
+                ElementPlus.ElMessage.success('数据已刷新');
+                console.log('✓ 刷新完成');
+            } catch (error) {
+                console.error('刷新数据失败:', error);
+                ElementPlus.ElMessage.error('刷新数据失败: ' + error.message);
+            }
+        }
+        
         // 卡片拖动排序
         function initDraggable() {
             const leftColumn = document.querySelector('[data-card="left"]');
@@ -239,6 +255,7 @@ const App = {
             profitLoading: profitCalendarModule.loading,
             recalculating,
             recalculateProfits,
+            refreshChartAndProfit,
             
             // 总市值图表相关
             ...marketValueChartModule,
