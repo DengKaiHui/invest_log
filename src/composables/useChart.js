@@ -1,7 +1,7 @@
 /**
  * 图表管理 Composable
  */
-export function useChart(Vue, records, isPrivacyMode) {
+export function useChart(Vue, records, isPrivacyMode, positionSummary) {
     const { ref, onMounted, nextTick } = Vue;
     
     const chartDom = ref(null);
@@ -21,21 +21,65 @@ export function useChart(Vue, records, isPrivacyMode) {
         });
     }
     
-    // 更新图表数据
+    // 更新图表数据（使用市值而非成本）
     function updateChart() {
         if (!myChart) return;
-        if (!records || !records.value) return;
+        if (!positionSummary || !positionSummary.value || positionSummary.value.length === 0) {
+            // 如果没有持仓数据，显示空状态
+            const option = {
+                color: ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899'],
+                tooltip: {
+                    trigger: 'item'
+                },
+                legend: {
+                    bottom: '0%',
+                    left: 'center'
+                },
+                series: [{
+                    type: 'pie',
+                    radius: ['50%', '80%'],
+                    center: ['50%', '45%'],
+                    itemStyle: {
+                        borderRadius: 8,
+                        borderColor: '#fff',
+                        borderWidth: 2
+                    },
+                    label: {
+                        show: false
+                    },
+                    data: [{ name: '暂无数据', value: 1 }]
+                }]
+            };
+            myChart.setOption(option, true);
+            return;
+        }
         
-        // 聚合数据
-        const agg = {};
-        records.value.forEach(item => {
-            agg[item.name] = (agg[item.name] || 0) + item.total;
+        // 从持仓汇总中提取市值数据
+        const data = [];
+        positionSummary.value.forEach(pos => {
+            // 只有当市值存在且不是 '--' 时才添加
+            if (pos.marketValue && pos.marketValue !== '--') {
+                const marketValue = parseFloat(pos.marketValue.replace(/,/g, ''));
+                if (!isNaN(marketValue) && marketValue > 0) {
+                    data.push({
+                        name: pos.displayName || pos.symbol,
+                        value: marketValue
+                    });
+                }
+            }
         });
         
-        const data = Object.keys(agg).map(k => ({
-            name: k,
-            value: agg[k]
-        }));
+        // 如果没有有效的市值数据，回退到成本数据
+        if (data.length === 0) {
+            positionSummary.value.forEach(pos => {
+                if (pos.totalCost && pos.totalCost > 0) {
+                    data.push({
+                        name: pos.displayName || pos.symbol,
+                        value: pos.totalCost
+                    });
+                }
+            });
+        }
         
         // 配置图表选项
         const option = {
@@ -46,7 +90,7 @@ export function useChart(Vue, records, isPrivacyMode) {
                     if (isPrivacyMode.value) {
                         return `${params.name}: **** (${params.percent}%)`;
                     }
-                    return `${params.name}: $${params.value.toFixed(2)} (${params.percent}%)`;
+                    return `${params.name}: $${params.value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${params.percent}%)`;
                 }
             },
             legend: {
@@ -79,26 +123,40 @@ export function useChart(Vue, records, isPrivacyMode) {
         myChart.setOption(option, true);
     }
     
-    // 复制资产分布
+    // 复制资产分布（使用市值）
     function copyAssetDistribution() {
-        if (!records || !records.value || records.value.length === 0) {
+        if (!positionSummary || !positionSummary.value || positionSummary.value.length === 0) {
             ElementPlus.ElMessage.warning('暂无数据');
             return;
         }
         
-        // 聚合数据
-        const agg = {};
+        // 聚合市值数据
+        const data = [];
         let total = 0;
-        records.value.forEach(item => {
-            agg[item.name] = (agg[item.name] || 0) + item.total;
-            total += item.total;
+        
+        positionSummary.value.forEach(pos => {
+            if (pos.marketValue && pos.marketValue !== '--') {
+                const marketValue = parseFloat(pos.marketValue.replace(/,/g, ''));
+                if (!isNaN(marketValue) && marketValue > 0) {
+                    data.push({
+                        name: pos.displayName || pos.symbol,
+                        value: marketValue
+                    });
+                    total += marketValue;
+                }
+            }
         });
         
+        if (data.length === 0 || total === 0) {
+            ElementPlus.ElMessage.warning('暂无有效市值数据');
+            return;
+        }
+        
         // 计算百分比并格式化
-        const result = Object.entries(agg)
-            .map(([name, value]) => {
-                const percentage = ((value / total) * 100).toFixed(2);
-                return `${name} ${percentage}%`;
+        const result = data
+            .map(item => {
+                const percentage = ((item.value / total) * 100).toFixed(2);
+                return `${item.name} ${percentage}%`;
             })
             .join(', ');
         

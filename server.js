@@ -1041,7 +1041,7 @@ async function scheduledPriceRefresh() {
     console.log('');
     
     // 第一步：刷新价格
-    console.log('【步骤 1/3】刷新股票价格...');
+    console.log('【步骤 1/4】刷新股票价格...');
     let successCount = 0;
     let failCount = 0;
     const today = new Date().toISOString().split('T')[0];
@@ -1063,7 +1063,7 @@ async function scheduledPriceRefresh() {
     console.log('');
     
     // 第二步：保存价格快照
-    console.log('【步骤 2/3】保存价格快照...');
+    console.log('【步骤 2/4】保存价格快照...');
     if (Object.keys(priceSnapshot).length > 0) {
         dailyPriceSnapshotDB.setBatch(today, priceSnapshot);
         console.log(`✓ 已保存价格快照到数据库: ${today}`);
@@ -1073,12 +1073,12 @@ async function scheduledPriceRefresh() {
     }
     console.log('');
     
-    // 第三步：计算并保存收益
+    // 第三步：计算并保存当天收益
     const startDate = new Date('2025-12-03');
     const currentDate = new Date(today);
     
     if (currentDate >= startDate) {
-        console.log('【步骤 3/3】计算并保存当天收益...');
+        console.log('【步骤 3/4】计算并保存当天收益...');
         try {
             const profitResult = await saveDailyProfit(today);
             const marketClosed = isMarketClosed(today);
@@ -1087,17 +1087,18 @@ async function scheduledPriceRefresh() {
             console.log(`  - 日期: ${today} ${marketClosed ? '(休市)' : '(开市)'}`);
             console.log(`  - 收益: $${profitResult.profit} (${profitResult.profitRate >= 0 ? '+' : ''}${profitResult.profitRate}%)`);
             console.log(`  - 总市值: $${profitResult.totalValue.toLocaleString('en-US', { minimumFractionDigits: 2 })}`);
-            
-            // 提示前端刷新
-            console.log('');
-            console.log('💡 提示: 前端将在下次刷新周期（10分钟内）自动更新收益日历和折线图');
         } catch (error) {
             console.error('✗ 计算收益失败:', error);
         }
     } else {
-        console.log('【步骤 3/3】跳过收益计算');
+        console.log('【步骤 3/4】跳过收益计算');
         console.log(`⏸  收益计算从2025-12-03开始，当前日期 ${today} 早于起始日期`);
     }
+    
+    // 第四步：通知前端刷新（通过广播事件或轮询机制）
+    console.log('');
+    console.log('【步骤 4/4】完成');
+    console.log('💡 提示: 前端将自动检测并刷新收益日历和总市值图表');
     
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
     console.log('');

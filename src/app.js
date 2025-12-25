@@ -9,7 +9,7 @@ import { useProfitCalendar } from './composables/useProfitCalendar.js';
 import { useMarketValueChart } from './composables/useMarketValueChart.js';
 import { storage, STORAGE_KEYS } from './utils/storage.js';
 import { formatCurrency } from './utils/formatter.js';
-import { recalculateAllProfits } from './utils/api.js';
+import { recalculateAllProfits, calculateProfit } from './utils/api.js';
 
 const { createApp, ref, computed, onMounted, nextTick } = Vue;
 
@@ -39,13 +39,24 @@ const App = {
             () => refreshPricesCallback && refreshPricesCallback()
         );
         
-        // 图表管理
-        const chartModule = useChart(Vue, recordsModule.records, isPrivacyMode);
+        // 持仓盈亏管理（传入价格更新回调）
+        const positionModule = usePosition(Vue, recordsModule.records, () => {
+            // 价格更新后，更新资产分布图表
+            if (updateChartCallback) {
+                updateChartCallback();
+            }
+        });
+        
+        // 图表管理（传入 positionSummary 用于基于市值计算）
+        const chartModule = useChart(Vue, recordsModule.records, isPrivacyMode, positionModule.positionSummary);
         updateChartCallback = chartModule.updateChart;
         
-        // 持仓盈亏管理
-        const positionModule = usePosition(Vue, recordsModule.records);
-        refreshPricesCallback = positionModule.refreshPrices;
+        // 刷新价格的回调，同时更新资产分布图表
+        refreshPricesCallback = async () => {
+            await positionModule.refreshPrices();
+            // 刷新价格后，更新资产分布图表
+            chartModule.updateChart();
+        };
         
         // 收益日历管理
         const profitCalendarModule = useProfitCalendar(Vue);
@@ -128,14 +139,28 @@ const App = {
             }
         }
         
-        // 刷新图表和收益数据（从数据库获取最新数据）
+        // 刷新图表和收益数据（从数据库获取最新数据，并重新计算当天收益）
         async function refreshChartAndProfit() {
             try {
-                console.log('📊 刷新收益数据和折线图...');
+                console.log('📊 刷新市值和收益数据...');
+                
+                // 1. 先刷新价格（更新价格缓存）
+                await positionModule.refreshPrices();
+                
+                // 2. 更新资产分布图表
+                chartModule.updateChart();
+                
+                // 3. 重新计算并保存当天收益
+                const today = new Date().toISOString().split('T')[0];
+                await calculateProfit(today);
+                console.log(`✓ 当天收益已重新计算: ${today}`);
+                
+                // 4. 刷新收益日历和总市值图表
                 await Promise.all([
                     profitCalendarModule.loadData(),
                     marketValueChartModule.loadMarketValueData()
                 ]);
+                
                 ElementPlus.ElMessage.success('数据已刷新');
                 console.log('✓ 刷新完成');
             } catch (error) {
@@ -223,7 +248,11 @@ const App = {
                 
                 // 加载价格数据（从数据库读取）
                 if (recordsModule.records.value.length > 0) {
-                    setTimeout(() => positionModule.loadPrices(), 500);
+                    setTimeout(async () => {
+                        await positionModule.loadPrices();
+                        // 价格加载后更新资产分布图表
+                        chartModule.updateChart();
+                    }, 500);
                 }
                 
                 // 加载收益日历数据

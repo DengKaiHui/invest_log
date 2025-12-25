@@ -5,7 +5,7 @@ import { storage, STORAGE_KEYS } from '../utils/storage.js';
 import { formatCurrency, formatDateTime, getProfitClass as utilGetProfitClass } from '../utils/formatter.js';
 import { fetchStockPrices, refreshStockPrices } from '../utils/api.js';
 
-export function usePosition(Vue, records) {
+export function usePosition(Vue, records, onPriceUpdate) {
     const { ref, computed, watch } = Vue;
     
     const priceLoading = ref(false);
@@ -135,6 +135,11 @@ export function usePosition(Vue, records) {
                 
                 lastUpdateTime.value = formatDateTime();
                 console.log('价格数据已从数据库加载');
+                
+                // 通知价格已更新
+                if (onPriceUpdate) {
+                    onPriceUpdate();
+                }
             }
         } catch (error) {
             console.error('加载价格失败:', error);
@@ -173,6 +178,11 @@ export function usePosition(Vue, records) {
                     ElementPlus.ElMessage.success(`价格已更新 (${successCount}个)`);
                 } else {
                     ElementPlus.ElMessage.warning(`部分更新成功 (成功: ${successCount}, 失败: ${failCount})`);
+                }
+                
+                // 通知价格已更新
+                if (onPriceUpdate) {
+                    onPriceUpdate();
                 }
             } else {
                 throw new Error('无法连接到价格服务');
