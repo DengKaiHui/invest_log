@@ -298,6 +298,25 @@ export const transactionDB = {
         return stmt.all();
     },
     
+    // 获取截至某个日期的持仓汇总（用于计算历史市值）
+    getSummaryUpToDate(date) {
+        const stmt = db.prepare(`
+            SELECT 
+                t.symbol,
+                s.name,
+                SUM(t.price * t.shares) as total_cost,
+                SUM(t.shares) as total_shares,
+                SUM(t.price * t.shares) / SUM(t.shares) as avg_price,
+                COUNT(*) as transaction_count
+            FROM transactions t
+            JOIN stocks s ON t.symbol = s.symbol
+            WHERE t.date <= ?
+            GROUP BY t.symbol
+            ORDER BY total_cost DESC
+        `);
+        return stmt.all(date);
+    },
+    
     // 计算某日的新增投入（替代存储在 daily_profits 中）
     getNewInvestmentByDate(date) {
         const stmt = db.prepare(`

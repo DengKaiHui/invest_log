@@ -139,7 +139,7 @@ const App = {
             }
         }
         
-        // 刷新图表和收益数据（从数据库获取最新数据，并重新计算当天收益）
+        // 刷新图表和收益数据（从数据库获取最新数据，并重新计算所有历史收益）
         async function refreshChartAndProfit() {
             try {
                 console.log('📊 刷新市值和收益数据...');
@@ -150,10 +150,10 @@ const App = {
                 // 2. 更新资产分布图表
                 chartModule.updateChart();
                 
-                // 3. 重新计算并保存当天收益
-                const today = new Date().toISOString().split('T')[0];
-                await calculateProfit(today);
-                console.log(`✓ 当天收益已重新计算: ${today}`);
+                // 3. 根据交易记录重新计算所有历史收益（包括每天的总市值）
+                console.log('⏳ 正在重新计算所有历史收益...');
+                const result = await recalculateAllProfits();
+                console.log(`✓ 收益重新计算完成: 已计算 ${result.calculated} 天的数据`);
                 
                 // 4. 刷新收益日历和总市值图表
                 await Promise.all([
@@ -161,7 +161,7 @@ const App = {
                     marketValueChartModule.loadMarketValueData()
                 ]);
                 
-                ElementPlus.ElMessage.success('数据已刷新');
+                ElementPlus.ElMessage.success(`数据已刷新（已重新计算 ${result.calculated} 天的收益）`);
                 console.log('✓ 刷新完成');
             } catch (error) {
                 console.error('刷新数据失败:', error);

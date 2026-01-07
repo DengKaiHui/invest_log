@@ -417,7 +417,8 @@ function isMarketClosed(dateStr) {
  * 3. 收益率 = T日收益 / (T-1)日总市值 * 100%
  */
 async function calculateDailyProfit(date) {
-    const summary = transactionDB.getSummary();
+    // 使用截至该日期的持仓汇总（重要：不包含未来的交易）
+    const summary = transactionDB.getSummaryUpToDate(date);
     
     if (summary.length === 0) {
         return { profit: 0, profitRate: 0, totalValue: 0 };
